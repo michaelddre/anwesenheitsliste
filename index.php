@@ -65,13 +65,44 @@ uksort($weeksByMonth, function ($a, $b) use ($months) {
   <meta charset="UTF-8">
   <title>Anwesenheitsübersicht <?= $year ?></title>
   <link rel="stylesheet" href="style.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 </head>
 <body>
   <!-- Header mit Logout- und Admin-Buttons -->
-  <div class="header">
-    <button class="logout-btn" onclick="window.location.href='logout.php'">Logout</button>
-    <button class="admin-btn" onclick="window.location.href='admin.php'">Benutzerverwaltung</button>
+  <header class="custom-header">
+ 
+  <img src="images/logo.png" alt="Attendio" class="logo">
+
+    <div id="notification-bubble" class="notification-bubble">
+  <svg class="bell-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M12 2C10.3 2 9 3.3 9 5v1.1c-3.1.5-5.5 3.1-5.5 6.3v4l-1.5 1.5V19h18v-1.1L20.5 16v-4c0-3.2-2.4-5.8-5.5-6.3V5c0-1.7-1.3-3-3-3zm0 20c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2z"/>
+  </svg>
+  <span class="badge" id="notification-badge"></span>
+</div>
+
+  <span class="badge" id="notification-badge"></span>
+</div>
+
+  <img id="user-avatar" class="user-avatar" src="images/default.jpg" alt="Benutzerbild">
+
+  <div class="user-greeting">
+    <div><span>Hallo, <strong id="username">...</strong> 👋</span></div>
+    <div class="last-login" id="last-login-time">Letzter Login: –</div>
   </div>
+  <div id="online-users" class="online-users">
+  <span class="label">Gerade online:</span>
+  <div id="online-avatar-list" class="avatars"></div>
+</div>
+
+
+  <div class="header-buttons">
+    <a href="admin.php" class="header-btn">Benutzerverwaltung</a>
+    <a href="logout.php" class="header-btn">Logout</a>
+  </div>
+</header>
+
+
 
   <div class="year-container">
     <h1 class="accordion-title">Anwesenheitsübersicht für <?= $year ?></h1>
@@ -111,7 +142,12 @@ uksort($weeksByMonth, function ($a, $b) use ($months) {
       </div>
     <?php endforeach; ?>
   </div>
-  <script src="http://localhost:3000/socket.io/socket.io.js"></script>
-  <script src="script.js"></script>
+
+<!-- Socket.IO zuerst -->
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<!-- Dann dein eigenes Script -->
+<script src="script.js" defer></script>
+
+
 </body>
 </html>

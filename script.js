@@ -1,6 +1,112 @@
-document.addEventListener("DOMContentLoaded", () => {
-  const socket = io("http://localhost:3000");
 
+let currentUserName = null;
+let currentUserImage = null;
+
+document.addEventListener("DOMContentLoaded", () => {
+  fetch("get_current_user.php")
+    .then((response) => response.json())
+    .then((user) => {
+      currentUserName = user.name;
+      currentUserImage = user.image;
+
+      document.getElementById("username").textContent = user.name;
+      document.getElementById("user-avatar").src = `images/${user.image}`;
+      document.getElementById("last-login-time").textContent = `Letzter Login: ${user.last_login}`;
+
+      // Jetzt ist alles bekannt – Socket starten
+      const socket = io("https://anwesenheitsliste.onrender.com/");
+
+      // userJoined senden
+      socket.emit("userJoined", {
+        name: currentUserName,
+        image: currentUserImage
+      });
+
+      // onlineUsers empfangen
+      const onlineList = document.getElementById("online-avatar-list");
+      socket.on("onlineUsers", (users) => {
+        if (!onlineList) return;
+        onlineList.innerHTML = "";
+
+        users.forEach((user) => {
+          const img = document.createElement("img");
+          img.src = `images/${user.image}`;
+          img.alt = user.name;
+          img.title = user.name;
+          img.className = "online-avatar";
+          onlineList.appendChild(img);
+        });
+      });
+
+      // attendanceUpdate empfangen
+      socket.on("attendanceUpdate", ({ user_id, week, day, new_status }) => {
+        // Deine bestehende Aktualisierungslogik hier...
+      });
+
+      // Und hier: wenn du später nochmal emitten willst, kannst du socket verwenden!
+    });
+});
+
+    // ✅ Änderungen live anzeigen
+    socket.on("attendanceUpdate", ({ user_id, week, day, new_status }) => {
+      document.querySelectorAll(".month-body").forEach((body) => {
+        const weeks = body.dataset.weeks.split(",");
+        const weekIndex = weeks.indexOf(week.toString());
+        if (weekIndex === -1) return;
+
+        const row = Array.from(body.querySelectorAll(".user-row")).find(
+          (r) => r.dataset.userId == user_id
+        );
+        if (!row) return;
+
+        const weekCell = row.querySelectorAll(".week-cell")[weekIndex];
+        if (!weekCell) return;
+
+        const wrapper = weekCell.querySelectorAll(".status-wrapper")[day - 1];
+        if (!wrapper) return;
+
+        const circle = wrapper.querySelector(".status-circle");
+        const select = wrapper.querySelector("select");
+
+        const newStatus = statuses.find((s) => s.code === new_status) || statuses[0];
+        circle.textContent = newStatus.code;
+        circle.style.backgroundColor = newStatus.color;
+        circle.title = newStatus.label;
+        if (select) select.value = new_status;
+      });
+    });
+ ;
+
+  socket.on("attendanceUpdate", ({ user_id, week, day, new_status }) => {
+      document.querySelectorAll(".month-body").forEach((body) => {
+        const weeks = body.dataset.weeks.split(",");
+        const weekIndex = weeks.indexOf(week.toString());
+        if (weekIndex === -1) return;
+
+        const row = Array.from(body.querySelectorAll(".user-row")).find(
+          (r) => r.dataset.userId == user_id
+        );
+        if (!row) return;
+
+        const weekCell = row.querySelectorAll(".week-cell")[weekIndex];
+        if (!weekCell) return;
+
+        const wrapper = weekCell.querySelectorAll(".status-wrapper")[day - 1];
+        if (!wrapper) return;
+
+        const circle = wrapper.querySelector(".status-circle");
+        const select = wrapper.querySelector("select");
+
+        const newStatus = statuses.find((s) => s.code === new_status) || statuses[0];
+        circle.textContent = newStatus.code;
+        circle.style.backgroundColor = newStatus.color;
+        circle.title = newStatus.label;
+        if (select) select.value = new_status;
+      });
+    });
+  ;
+
+document.addEventListener("DOMContentLoaded", () => {
   const statuses = [
     { code: "", label: "—", color: "#e5e7eb" },
     { code: "H", label: "Home Office", color: "#99f6e4" },
@@ -12,36 +118,6 @@ document.addEventListener("DOMContentLoaded", () => {
     { code: "KK", label: "Kind Krank", color: "#facc15" },
     { code: "F", label: "FZA", color: "#bae6fd" }
   ];
-
-  socket.on("attendanceUpdate", ({ user_id, week, day, new_status }) => {
-    console.log("📡 Live-Update empfangen:", user_id, week, day, new_status);
-
-    document.querySelectorAll(".month-body").forEach((body) => {
-      const weeks = body.dataset.weeks.split(",");
-      const weekIndex = weeks.indexOf(week.toString());
-      if (weekIndex === -1) return;
-
-      const row = Array.from(body.querySelectorAll(".user-row")).find(
-        (r) => r.dataset.userId == user_id
-      );
-      if (!row) return;
-
-      const weekCell = row.querySelectorAll(".week-cell")[weekIndex];
-      if (!weekCell) return;
-
-      const wrapper = weekCell.querySelectorAll(".status-wrapper")[day - 1];
-      if (!wrapper) return;
-
-      const circle = wrapper.querySelector(".status-circle");
-      const select = wrapper.querySelector("select");
-
-      const newStatus = statuses.find((s) => s.code === new_status) || statuses[0];
-      circle.textContent = newStatus.code;
-      circle.style.backgroundColor = newStatus.color;
-      circle.title = newStatus.label;
-      if (select) select.value = new_status;
-    });
-  });
 
   const getStatusLabel = (code) =>
     statuses.find((s) => s.code === code)?.label || "—";
@@ -56,152 +132,98 @@ document.addEventListener("DOMContentLoaded", () => {
     return resultDate;
   };
 
-  const shownNotifications = new Set();
+  const shownNotifications = new Map();
   let lastLoginTime = null;
-  let isCollapsed = false;
+  const bubble = document.getElementById("notification-bubble");
+  const badge = document.getElementById("notification-badge");
 
-  const notificationsContainer = document.createElement("div");
-  notificationsContainer.id = "notifications";
-  notificationsContainer.style.position = "fixed";
-  notificationsContainer.style.top = "20px";
-  notificationsContainer.style.left = "20px";
-  notificationsContainer.style.zIndex = "9999";
-  notificationsContainer.style.maxWidth = "320px";
-  notificationsContainer.style.background = "#f8fafc";
-  notificationsContainer.style.border = "1px solid #cbd5e1";
-  notificationsContainer.style.borderRadius = "8px";
-  notificationsContainer.style.boxShadow = "0 4px 12px rgba(0,0,0,0.1)";
-  notificationsContainer.style.overflow = "hidden";
-  notificationsContainer.style.fontFamily = "sans-serif";
-
-  const header = document.createElement("div");
-  header.style.display = "flex";
-  header.style.justifyContent = "space-between";
-  header.style.alignItems = "center";
-  header.style.background = "#1f2937";
-  header.style.color = "white";
-  header.style.padding = "8px 12px";
-  header.style.cursor = "pointer";
-  header.style.position = "relative";
-  header.style.overflow = "visible";
-
-  const title = document.createElement("span");
-  title.textContent = "🔔 Benachrichtigungen";
-  title.style.fontWeight = "bold";
-
-  const toggleIcon = document.createElement("span");
-  toggleIcon.textContent = "";
-  toggleIcon.style.fontSize = "12px";
-
-  const badge = document.createElement("span");
-  badge.style.position = "absolute";
-  badge.style.top = "2px";
-  badge.style.right = "2px";
-  badge.style.minWidth = "20px";
-  badge.style.height = "20px";
-  badge.style.padding = "0 6px";
-  badge.style.borderRadius = "999px";
-  badge.style.background = "#ef4444";
-  badge.style.color = "white";
-  badge.style.fontWeight = "bold";
-  badge.style.fontSize = "12px";
-  badge.style.display = "none";
-  badge.style.alignItems = "center";
-  badge.style.justifyContent = "center";
-  badge.style.textAlign = "center";
-  badge.style.lineHeight = "20px";
-
-  header.appendChild(title);
-  header.appendChild(toggleIcon);
-  header.appendChild(badge);
-  notificationsContainer.appendChild(header);
-
-  const content = document.createElement("div");
-  content.style.padding = "10px";
-  content.style.display = "flex";
-  content.style.flexDirection = "column";
-  content.style.gap = "10px";
-
-  const emptyMessage = document.createElement("div");
-  emptyMessage.textContent = "🙌 Keine ungelesenen Benachrichtigungen";
-  emptyMessage.style.color = "#64748b";
-  emptyMessage.style.fontSize = "14px";
-  emptyMessage.style.textAlign = "center";
-
-  const clearBtn = document.createElement("button");
-  clearBtn.textContent = "✅ Alle als gelesen";
-  clearBtn.style.padding = "6px 10px";
-  clearBtn.style.borderRadius = "6px";
-  clearBtn.style.border = "none";
-  clearBtn.style.background = "#4b5563";
-  clearBtn.style.color = "white";
-  clearBtn.style.cursor = "pointer";
-  clearBtn.addEventListener("click", () => {
-    content.querySelectorAll(".notification").forEach((n) => n.remove());
-    fetch("mark_notifications_read.php", { method: "POST" });
-    shownNotifications.clear();
-    updateNotificationState();
+  const dropdown = document.createElement("div");
+  dropdown.id = "notification-dropdown";
+  Object.assign(dropdown.style, {
+    position: "absolute",
+    top: "50px",
+    left: "0",
+    background: "#1f2937",
+    color: "white",
+    borderRadius: "8px",
+    padding: "10px 16px",
+    boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+    fontSize: "14px",
+    minWidth: "240px",
+    display: "none",
+    zIndex: "1000",
+    flexDirection: "column",
+    gap: "10px"
   });
 
-  const updateNotificationState = () => {
-    const count = content.querySelectorAll(".notification").length;
-    if (count > 0) {
-      if (!content.contains(clearBtn)) content.prepend(clearBtn);
-      emptyMessage.remove();
-      title.textContent = "🔔 Benachrichtigungen";
-      badge.textContent = count;
-      badge.style.display = "flex";
-    } else {
-      if (content.contains(clearBtn)) clearBtn.remove();
-      content.appendChild(emptyMessage);
-      title.textContent = "✅ Keine Benachrichtigungen";
+  bubble.style.position = "relative";
+  bubble.appendChild(dropdown);
+
+  const updateDropdown = () => {
+    dropdown.innerHTML = "";
+    if (shownNotifications.size === 0) {
+      const empty = document.createElement("div");
+      empty.textContent = "🙌 Keine ungelesenen Benachrichtigungen";
+      empty.style.color = "#cbd5e1";
+      dropdown.appendChild(empty);
       badge.style.display = "none";
+    } else {
+      for (const el of shownNotifications.values()) {
+        dropdown.appendChild(el);
+      }
+
+      const clearBtn = document.createElement("button");
+      clearBtn.textContent = "✅ Alle als gelesen";
+      Object.assign(clearBtn.style, {
+        padding: "6px 10px",
+        borderRadius: "6px",
+        border: "none",
+        background: "#4b5563",
+        color: "white",
+        cursor: "pointer"
+      });
+      clearBtn.onclick = () => {
+        shownNotifications.clear();
+        updateDropdown();
+        fetch("mark_notifications_read.php", { method: "POST" });
+      };
+      dropdown.appendChild(clearBtn);
+      badge.style.display = "flex";
+      badge.textContent = shownNotifications.size;
     }
   };
 
-  header.addEventListener("click", () => {
-    isCollapsed = !isCollapsed;
-    content.style.display = isCollapsed ? "none" : "flex";
-    toggleIcon.textContent = isCollapsed ? "" : "";
+  bubble.addEventListener("click", () => {
+    dropdown.style.display = dropdown.style.display === "none" ? "flex" : "none";
   });
-
-  content.style.display = "flex";
-  notificationsContainer.appendChild(content);
-  document.body.appendChild(notificationsContainer);
 
   const createNotificationKey = (n) =>
     `${n.user_name}-${n.date}-${n.old_status}-${n.new_status}`;
 
   const showNotification = (n, isNewFromServer = false) => {
+    if (n.changed_by_name === currentUserName) return;
     const key = createNotificationKey(n);
     if (shownNotifications.has(key)) return;
-    shownNotifications.add(key);
 
     const div = document.createElement("div");
     div.className = "notification";
-
     const formatted = new Date(n.date).toLocaleDateString("de-DE");
-    div.textContent = `📝 ${n.changed_by_name} hat ${n.user_name}s Status am ${formatted} von ${getStatusLabel(n.old_status)} zu ${getStatusLabel(n.new_status)} geändert`;
+    div.textContent = `📌 ${n.changed_by_name} hat ${n.user_name}s Status am ${formatted} von ${getStatusLabel(n.old_status)} zu ${getStatusLabel(n.new_status)} geändert`;
 
     const created = new Date(n.created_at);
     const isOld = lastLoginTime && created < lastLoginTime;
 
-    div.style.background = isOld ? "#e5e7eb" : "#fef08a";
-    div.style.color = "#1f2937";
-    div.style.padding = "10px 14px";
-    div.style.borderRadius = "6px";
-    div.style.boxShadow = "inset 0 0 2px rgba(0,0,0,0.1)";
-    div.style.fontSize = "14px";
-    div.style.animation = "fadeIn 0.3s ease-in-out";
+    Object.assign(div.style, {
+      background: isOld ? "#e5e7eb" : "#fef08a",
+      color: "#1f2937",
+      padding: "10px 14px",
+      borderRadius: "6px",
+      fontSize: "14px",
+      boxShadow: "inset 0 0 2px rgba(0,0,0,0.1)"
+    });
 
-    content.insertBefore(div, clearBtn.nextSibling);
-    updateNotificationState();
-
-    if (isNewFromServer && isCollapsed) {
-      isCollapsed = false;
-      content.style.display = "flex";
-      toggleIcon.textContent = "▲";
-    }
+    shownNotifications.set(key, div);
+    updateDropdown();
   };
 
   const pollNotifications = () => {
@@ -214,8 +236,8 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   setInterval(pollNotifications, 5000);
+  updateDropdown();
 
-  // Anwesenheitsanzeige
   fetch("load_users.php")
     .then((res) => res.json())
     .then((users) => {
@@ -268,8 +290,7 @@ document.addEventListener("DOMContentLoaded", () => {
                   (a) => a.user_id == user.id && a.day == d
                 );
                 const current = entry ? entry.status : "";
-                const status =
-                  statuses.find((s) => s.code === current) || statuses[0];
+                const status = statuses.find((s) => s.code === current) || statuses[0];
 
                 const wrapper = document.createElement("div");
                 wrapper.className = "status-wrapper";
@@ -311,10 +332,9 @@ document.addEventListener("DOMContentLoaded", () => {
                     user_name: user.name,
                     date: date.toISOString(),
                     old_status: current,
-                    new_status: selected.code
+                    new_status: selected.code,
+                    changed_by_name: currentUserName
                   };
-                  const key = createNotificationKey(notificationData);
-                  shownNotifications.add(key);
 
                   fetch("update_attendance.php", {
                     method: "POST",
@@ -327,7 +347,6 @@ document.addEventListener("DOMContentLoaded", () => {
                     })
                   }).then(() => {
                     showNotification(notificationData, false);
-
                     socket.emit("attendanceChanged", {
                       user_id: user.id,
                       week: parseInt(week),
