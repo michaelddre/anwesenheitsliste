@@ -1,10 +1,10 @@
-
 let currentUserName = null;
 let currentUserImage = null;
+let socket = null;
 
 document.addEventListener("DOMContentLoaded", () => {
   fetch("get_current_user.php")
-    .then((response) => response.json())
+    .then((res) => res.json())
     .then((user) => {
       currentUserName = user.name;
       currentUserImage = user.image;
@@ -13,18 +13,15 @@ document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("user-avatar").src = `images/${user.image}`;
       document.getElementById("last-login-time").textContent = `Letzter Login: ${user.last_login}`;
 
-      // Jetzt ist alles bekannt – Socket starten
-      const socket = io("https://anwesenheitsliste.onrender.com/");
+      socket = io("https://anwesenheitsliste.onrender.com/");
 
-      // userJoined senden
       socket.emit("userJoined", {
         name: currentUserName,
         image: currentUserImage
       });
 
-      // onlineUsers empfangen
-      const onlineList = document.getElementById("online-avatar-list");
       socket.on("onlineUsers", (users) => {
+        const onlineList = document.getElementById("online-avatar-list");
         if (!onlineList) return;
         onlineList.innerHTML = "";
 
@@ -34,91 +31,56 @@ document.addEventListener("DOMContentLoaded", () => {
           img.alt = user.name;
           img.title = user.name;
           img.className = "online-avatar";
+          img.onerror = () => (img.src = "images/default.jpg");
           onlineList.appendChild(img);
         });
       });
 
-      // attendanceUpdate empfangen
       socket.on("attendanceUpdate", ({ user_id, week, day, new_status }) => {
-        // Deine bestehende Aktualisierungslogik hier...
+        document.querySelectorAll(".month-body").forEach((body) => {
+          const weeks = body.dataset.weeks.split(",");
+          const weekIndex = weeks.indexOf(week.toString());
+          if (weekIndex === -1) return;
+
+          const row = Array.from(body.querySelectorAll(".user-row")).find(
+            (r) => r.dataset.userId == user_id
+          );
+          if (!row) return;
+
+          const weekCell = row.querySelectorAll(".week-cell")[weekIndex];
+          if (!weekCell) return;
+
+          const wrapper = weekCell.querySelectorAll(".status-wrapper")[day - 1];
+          if (!wrapper) return;
+
+          const circle = wrapper.querySelector(".status-circle");
+          const select = wrapper.querySelector("select");
+
+          const newStatus = statuses.find((s) => s.code === new_status) || statuses[0];
+          circle.textContent = newStatus.code;
+          circle.style.backgroundColor = newStatus.color;
+          circle.title = newStatus.label;
+          if (select) select.value = new_status;
+        });
       });
 
-      // Und hier: wenn du später nochmal emitten willst, kannst du socket verwenden!
+      initApp(); // Restliche App starten
     });
 });
 
-    // ✅ Änderungen live anzeigen
-    socket.on("attendanceUpdate", ({ user_id, week, day, new_status }) => {
-      document.querySelectorAll(".month-body").forEach((body) => {
-        const weeks = body.dataset.weeks.split(",");
-        const weekIndex = weeks.indexOf(week.toString());
-        if (weekIndex === -1) return;
+const statuses = [
+  { code: "", label: "—", color: "#e5e7eb" },
+  { code: "H", label: "Home Office", color: "#99f6e4" },
+  { code: "A", label: "Büro / Arbeit", color: "#a7f3d0" },
+  { code: "U", label: "Urlaub", color: "#f9a8d4" },
+  { code: "HU", label: "1/2 Tag Urlaub", color: "#d8b4fe" },
+  { code: "GU", label: "Geplanter Urlaub", color: "#c084fc" },
+  { code: "K", label: "Krank", color: "#fde047" },
+  { code: "KK", label: "Kind Krank", color: "#facc15" },
+  { code: "F", label: "FZA", color: "#bae6fd" }
+];
 
-        const row = Array.from(body.querySelectorAll(".user-row")).find(
-          (r) => r.dataset.userId == user_id
-        );
-        if (!row) return;
-
-        const weekCell = row.querySelectorAll(".week-cell")[weekIndex];
-        if (!weekCell) return;
-
-        const wrapper = weekCell.querySelectorAll(".status-wrapper")[day - 1];
-        if (!wrapper) return;
-
-        const circle = wrapper.querySelector(".status-circle");
-        const select = wrapper.querySelector("select");
-
-        const newStatus = statuses.find((s) => s.code === new_status) || statuses[0];
-        circle.textContent = newStatus.code;
-        circle.style.backgroundColor = newStatus.color;
-        circle.title = newStatus.label;
-        if (select) select.value = new_status;
-      });
-    });
- ;
-
-  socket.on("attendanceUpdate", ({ user_id, week, day, new_status }) => {
-      document.querySelectorAll(".month-body").forEach((body) => {
-        const weeks = body.dataset.weeks.split(",");
-        const weekIndex = weeks.indexOf(week.toString());
-        if (weekIndex === -1) return;
-
-        const row = Array.from(body.querySelectorAll(".user-row")).find(
-          (r) => r.dataset.userId == user_id
-        );
-        if (!row) return;
-
-        const weekCell = row.querySelectorAll(".week-cell")[weekIndex];
-        if (!weekCell) return;
-
-        const wrapper = weekCell.querySelectorAll(".status-wrapper")[day - 1];
-        if (!wrapper) return;
-
-        const circle = wrapper.querySelector(".status-circle");
-        const select = wrapper.querySelector("select");
-
-        const newStatus = statuses.find((s) => s.code === new_status) || statuses[0];
-        circle.textContent = newStatus.code;
-        circle.style.backgroundColor = newStatus.color;
-        circle.title = newStatus.label;
-        if (select) select.value = new_status;
-      });
-    });
-  ;
-
-document.addEventListener("DOMContentLoaded", () => {
-  const statuses = [
-    { code: "", label: "—", color: "#e5e7eb" },
-    { code: "H", label: "Home Office", color: "#99f6e4" },
-    { code: "A", label: "Büro / Arbeit", color: "#a7f3d0" },
-    { code: "U", label: "Urlaub", color: "#f9a8d4" },
-    { code: "HU", label: "1/2 Tag Urlaub", color: "#d8b4fe" },
-    { code: "GU", label: "Geplanter Urlaub", color: "#c084fc" },
-    { code: "K", label: "Krank", color: "#fde047" },
-    { code: "KK", label: "Kind Krank", color: "#facc15" },
-    { code: "F", label: "FZA", color: "#bae6fd" }
-  ];
-
+function initApp() {
   const getStatusLabel = (code) =>
     statuses.find((s) => s.code === code)?.label || "—";
 
@@ -193,10 +155,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   };
 
-  bubble.addEventListener("click", () => {
-    dropdown.style.display = dropdown.style.display === "none" ? "flex" : "none";
-  });
-
   const createNotificationKey = (n) =>
     `${n.user_name}-${n.date}-${n.old_status}-${n.new_status}`;
 
@@ -234,6 +192,10 @@ document.addEventListener("DOMContentLoaded", () => {
         data.notifications.forEach((n) => showNotification(n, true));
       });
   };
+
+  bubble.addEventListener("click", () => {
+    dropdown.style.display = dropdown.style.display === "none" ? "flex" : "none";
+  });
 
   setInterval(pollNotifications, 5000);
   updateDropdown();
@@ -347,12 +309,14 @@ document.addEventListener("DOMContentLoaded", () => {
                     })
                   }).then(() => {
                     showNotification(notificationData, false);
-                    socket.emit("attendanceChanged", {
-                      user_id: user.id,
-                      week: parseInt(week),
-                      day: d,
-                      new_status: selected.code
-                    });
+                    if (socket) {
+                      socket.emit("attendanceChanged", {
+                        user_id: user.id,
+                        week: parseInt(week),
+                        day: d,
+                        new_status: selected.code
+                      });
+                    }
                   });
                 });
 
@@ -370,4 +334,4 @@ document.addEventListener("DOMContentLoaded", () => {
         });
       });
     });
-});
+}
