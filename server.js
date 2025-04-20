@@ -35,6 +35,11 @@ io.on("connection", (socket) => {
   });
 });
 
+
+app.get("/", (req, res) => {
+  res.send("✅ Socket.IO-Server ist online!");
+});
+
 // 🔥 Render stellt dir den Port über process.env.PORT zur Verfügung
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => {

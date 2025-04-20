@@ -1,15 +1,14 @@
 {
-    "name": "anwesenheitsliste-live",
-    "version": "1.0.0",
-    "description": "Live-Update-Server für Anwesenheitsliste",
-    "main": "server.js",
-    "scripts": {
-      "start": "node server.js"
-    },
-    "dependencies": {
-      "express": "^4.18.2",
-      "socket.io": "^4.8.1",
-      "cors": "^2.8.5"
-    }
+  "name": "anwesenheitsliste-live",
+  "version": "1.0.0",
+  "description": "Live-Update-Server für Anwesenheitsliste",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.8.1",
+    "cors": "^2.8.5"
   }
-  
+}
